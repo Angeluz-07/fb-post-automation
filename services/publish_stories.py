@@ -3,14 +3,7 @@ import os
 import random
 from PIL import Image, ImageStat
 import time
-from pages import pages_repository
-
-# --- CONFIGURACIÓN ---
-PAGE_ID = ""
-page = pages_repository.get_by_id(PAGE_ID)
-
-INPUT_FOLDER = './.data/ss/input_pictures'
-DEBUG_FOLDER = './.data/ss/processed_pictures'
+from pages import pages_repository, get_stories_input_folder, get_stories_output_folder
 
 TARGET_RES = (1080, 1920)
 
@@ -18,7 +11,6 @@ TARGET_RES = (1080, 1920)
 NUM_IMAGENES_A_PUBLICAR = 3  # Cantidad de imágenes por ejecución
 DELAY_DEFAULT = 30            # Segundos entre cada publicación
 
-os.makedirs(DEBUG_FOLDER, exist_ok=True)
 
 def get_page_token(user_token, page_id):
     url = f"https://graph.facebook.com/v21.0/{page_id}?fields=access_token&access_token={user_token}"
@@ -29,7 +21,7 @@ def get_dominant_color(image):
     stat = ImageStat.Stat(image)
     return tuple(int(c) for c in stat.mean)
 
-def preprocess_image(image_path):
+def preprocess_image(image_path, debug_folder):
     with Image.open(image_path) as img:
         if img.mode in ("RGBA", "P"): img = img.convert("RGB")
         
@@ -47,11 +39,11 @@ def preprocess_image(image_path):
         canvas.paste(img_resized, (0, y_offset))
         
         file_name = os.path.basename(image_path)
-        debug_path = os.path.join(DEBUG_FOLDER, f"proc_{file_name}")
+        debug_path = os.path.join(debug_folder, f"proc_{file_name}")
         canvas.save(debug_path, "JPEG", quality=90)
         return debug_path
 
-def my_fn(page_id, token, img_path):
+def _publish_story(page_id, token, img_path):
     upload_url = f"https://graph.facebook.com/v21.0/{page_id}/photos"
     payload = {'access_token': token, 'published': 'false'}
     
@@ -82,7 +74,7 @@ def my_fn(page_id, token, img_path):
         print(f"   💥 Ocurrió un error: {e}")
         return False
 
-def obtener_todas_las_fotos(directorio):
+def get_all_pictures(directorio):
     """Busca imágenes en el directorio y todas sus subcarpetas."""
     extensiones = ('.jpg', '.png', '.jpeg')
     lista_fotos = []
@@ -93,35 +85,40 @@ def obtener_todas_las_fotos(directorio):
     return lista_fotos
 
 def main():
-    todas_las_fotos = obtener_todas_las_fotos(INPUT_FOLDER)
+    for page in pages_repository.get_all():
+        input_folder = get_stories_input_folder(page.stories_folder)
+        debug_folder = get_stories_output_folder(page.stories_folder)
+        os.makedirs(debug_folder, exist_ok=True)
+
+        pictures_pool = get_all_pictures(input_folder)
+
+        if not pictures_pool:
+            return print("Carpeta vacía o sin imágenes compatibles.")
+
+        # Seleccionar lote aleatorio
+        cantidad = min(len(pictures_pool), NUM_IMAGENES_A_PUBLICAR)
+        lote = random.sample(pictures_pool, cantidad)
     
-    if not todas_las_fotos:
-        return print("Carpeta vacía o sin imágenes compatibles.")
+        print(f"📂 Encontradas {len(pictures_pool)} fotos. Iniciando lote de {cantidad}...")
 
-    # Seleccionar lote aleatorio
-    cantidad = min(len(todas_las_fotos), NUM_IMAGENES_A_PUBLICAR)
-    lote = random.sample(todas_las_fotos, cantidad)
-    
-    print(f"📂 Encontradas {len(todas_las_fotos)} fotos. Iniciando lote de {cantidad}...")
+        for i, foto_path in enumerate(lote):
+            print(f"\n📸 [{i+1}/{cantidad}] Procesando: {os.path.basename(foto_path)}")
+            ruta_procesada = preprocess_image(foto_path, debug_folder)
+            
+            token_pagina = page.access_token
+            
+            if token_pagina:
+                print(f"   🚀 Publicando en: {page.name}...")
+                _publish_story(page.id, token_pagina, ruta_procesada)
+            else:
+                print(f"   ⚠️ No se pudo obtener token para {page['nombre']}")
 
-    for i, foto_path in enumerate(lote):
-        print(f"\n📸 [{i+1}/{cantidad}] Procesando: {os.path.basename(foto_path)}")
-        ruta_procesada = preprocess_image(foto_path)
-        
-        token_pagina = page.access_token
-        
-        if token_pagina:
-            print(f"   🚀 Publicando en: {page.name}...")
-            my_fn(page.id, token_pagina, ruta_procesada)
-        else:
-            print(f"   ⚠️ No se pudo obtener token para {page['nombre']}")
+            # Delay entre imágenes del lote (no se aplica en la última)
+            if i < cantidad - 1:
+                print(f"⏳ Esperando {DELAY_DEFAULT} segundos para la siguiente...")
+                time.sleep(DELAY_DEFAULT)
 
-        # Delay entre imágenes del lote (no se aplica en la última)
-        if i < cantidad - 1:
-            print(f"⏳ Esperando {DELAY_DEFAULT} segundos para la siguiente...")
-            time.sleep(DELAY_DEFAULT)
-
-    print("\n✨ Proceso de lote finalizado.")
+        print(f"\n✨ Proceso de lote finalizado. for page {page.name}")
 
 if __name__ == "__main__":
     main()
