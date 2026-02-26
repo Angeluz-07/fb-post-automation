@@ -29,8 +29,6 @@ class PagesRepo:
         data = self._read_all()
         return [self._map_to_entity(item) for item in data]
     
- 
-
     def _map_to_entity(self, data: dict) -> Page:
         """Helper to reconstruct the objects from a dictionary."""
         return Page(
