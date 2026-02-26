@@ -40,4 +40,4 @@ class PagesRepo:
         item = next((x for x in data if x["id"] == id), None)
         return self._map_to_entity(item) if item else None
 
-print(PagesRepo().get_by_id("101349552584924"))
+pages_repository = PagesRepo()

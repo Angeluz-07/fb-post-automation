@@ -2,18 +2,16 @@ import requests
 import os
 import random
 from PIL import Image, ImageStat
-
-
-import os
-import random
 import time
-import requests
-from PIL import Image, ImageStat
+from pages import pages_repository
 
+# --- CONFIGURACIÓN ---
+PAGE_ID = ""
+page = pages_repository.get_by_id(PAGE_ID)
 
+INPUT_FOLDER = './.data/ss/input_pictures'
+DEBUG_FOLDER = './.data/ss/processed_pictures'
 
-INPUT_FOLDER = './fotos_originales'
-DEBUG_FOLDER = './fotos_procesadas'
 TARGET_RES = (1080, 1920)
 
 # --- NUEVOS PARÁMETROS ---
@@ -110,16 +108,13 @@ def main():
         print(f"\n📸 [{i+1}/{cantidad}] Procesando: {os.path.basename(foto_path)}")
         ruta_procesada = preprocess_image(foto_path)
         
-        for page in PAGES:
-            # Obtenemos token fresco de la página (opcional si ya los tienes en la lista)
-            #token_pagina = get_page_token(USER_TOKEN, page['id'])
-            token_pagina = USER_TOKEN
-            
-            if token_pagina:
-                print(f"   🚀 Publicando en: {page['nombre']}...")
-                my_fn(page['id'], token_pagina, ruta_procesada)
-            else:
-                print(f"   ⚠️ No se pudo obtener token para {page['nombre']}")
+        token_pagina = page.access_token
+        
+        if token_pagina:
+            print(f"   🚀 Publicando en: {page.name}...")
+            my_fn(page.id, token_pagina, ruta_procesada)
+        else:
+            print(f"   ⚠️ No se pudo obtener token para {page['nombre']}")
 
         # Delay entre imágenes del lote (no se aplica en la última)
         if i < cantidad - 1:
