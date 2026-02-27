@@ -5,11 +5,12 @@ from datetime import datetime
 from pathlib import Path
 
 from prompt_config import PromptConfig, prompts_config_repository
+from advices import advice_repository, AdviceRepo, Advice
 
 MODELO = "gemma3:4b" # mas literario
 #MODELO = "llama3.2:3b" # mas equilibrado
 
-def generar_story(out_folder: str, prompt_config: PromptConfig):
+def generar_story(prompt_config: PromptConfig):
 
     response = ollama.chat(
         model=MODELO,
@@ -30,15 +31,19 @@ def generar_story(out_folder: str, prompt_config: PromptConfig):
         "conteo_palabras": len(historia.split())
     }
 
-    filename = f"historia_{datetime.now().strftime('%H%M%S')}.json"
-    out_file = Path(out_folder) / filename
-    with open(out_file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    adv = Advice(
+        topic= prompt_config.name,
+        text = historia, 
+        num_words=len(historia.split()),
+        prompt_config_id=prompt_config.id,
+        creation_duration=float(round(response.total_duration/1e9, 2))
+    )
 
-    return f"Generada: {data['conteo_palabras']} palabras."
+
+    return adv
 
 if __name__ == "__main__":
     prompt = prompts_config_repository.get_by_id("2")
-    out_folder = '.data/prompts_out'
-    os.makedirs(out_folder, exist_ok=True)
-    generar_story(out_folder, prompt)
+    adv = generar_story(prompt)
+    advice_repository.add(adv)
+    print(f"successfully generated in {adv.creation_duration} -> {adv}")

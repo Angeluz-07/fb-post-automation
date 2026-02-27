@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Optional
 import json
 from dataclasses import asdict
+from datetime import timezone
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_FOLDER = BASE_DIR / ".data"
@@ -15,7 +16,8 @@ class Advice:
     topic: str
     text: str
     num_words: int
-    created_at: datetime
+    creation_duration: float
+    created_at: datetime = field(default_factory= lambda : datetime.now(timezone.utc))
     id:  str = field(default_factory=lambda: str(uuid4()))
     prompt_config_id: str = None
     
@@ -29,16 +31,16 @@ class AdviceRepo:
         
     def _ensure_file_exists(self):
         if not self.file_path.exists():
-            with open(self.file_path, 'w') as f:
-                json.dump([], f)
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump([], f, ensure_ascii=False)
 
     def _read_all(self) -> List[dict]:
         with open(self.file_path, 'r', encoding='utf-8') as f:
             return json.load(f)
 
     def _write_all(self, data: List[dict]):
-        with open(self.file_path, 'w') as f:
-            json.dump(data, f, indent=4)
+        with open(self.file_path, 'w',encoding='utf-8') as f:
+            json.dump(data, f,ensure_ascii=False, indent=4)
     
 
     def get_all(self) -> List[Advice]:
@@ -52,6 +54,7 @@ class AdviceRepo:
             text=data['text'],
             num_words=data['num_words'],
             created_at=datetime.fromisoformat(data['created_at']),
+            creation_duration=data["creation_duration"],
             id=data['id'],
             prompt_config_id=data["prompt_config_id"]
         )
