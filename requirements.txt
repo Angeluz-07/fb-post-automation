@@ -2,3 +2,4 @@ requests
 python-dotenv
 
 pillow # for image processing
+ollama # for genai
